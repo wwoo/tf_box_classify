@@ -1,0 +1,84 @@
+<html>
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+  <script>
+    var timed_function;
+    $(document).ready(function() {
+      var canvas = document.getElementById("canvas"),
+      context = canvas.getContext("2d"),
+      video = document.getElementById("webcam"),
+      videoObj = { "video": true },
+      errBack = function(error) {
+        console.log("Video capture error: ", error.code);
+      };
+
+      if (navigator.getUserMedia) { // Standard
+        navigator.getUserMedia(videoObj, function(stream) {
+          video.src = stream;
+      		video.play();
+      	}, errBack);
+      } else if (navigator.webkitGetUserMedia) { // WebKit-prefixed
+        navigator.webkitGetUserMedia(videoObj, function(stream){
+      	   video.src = window.URL.createObjectURL(stream);
+           video.play();
+        }, errBack);
+      }
+      else if (navigator.mozGetUserMedia) { // Firefox-prefixed
+        navigator.mozGetUserMedia(videoObj, function(stream){
+      	   video.src = window.URL.createObjectURL(stream);
+           video.play();
+         }, errBack);
+      }
+
+      $('#continuous_mode').change(function() {
+          if($(this).is(":checked")) {
+            timed_function = setInterval(classify, 1000);
+          }
+          else {
+            clearInterval(timed_function);
+          }
+      });
+
+      $('#snap').click(function() {
+        classify()
+      });
+
+      function classify() {
+        var c = document.getElementById("canvas");
+        context.drawImage(webcam, 170, 90, 300, 300, 0, 0, 300, 300);
+        $.post("/classify",
+        {
+          img: canvas.toDataURL("image/jpeg")
+        },
+        function (data, status) {
+          if (status == 'success') {
+            obj = JSON.parse(data);
+
+            if (obj.predicted_label == 'upright') {
+              $('#predict_text').text('Cardboard box is UPRIGHT');
+            }
+            else if (obj.predicted_label == 'tilted') {
+              $('#predict_text').text('Cardboard box is TILTED');
+            }
+            else if (obj.predicted_label == 'open') {
+              $('#predict_text').text('Cardboard box is OPEN');
+            }
+            else if (obj.predicted_label == 'spilt') {
+              $('#predict_text').text('Clean up on aile 3!');
+            }
+          }
+        });
+      }
+    });
+  </script>
+</head>
+<body>
+  <div style="width:800px; margin:100 auto;">
+    <p><div style="font-family: arial; font-size: 30px" id="predict_text">&nbsp;</div></p>
+    <p><video id="webcam" width="640" height="480" autoplay></video></p>
+    <p><input id="continuous_mode" type="checkbox"><span style="font-family: arial">Continuous Mode<span>
+      &nbsp;<button id="snap">Take Photo</button></p>
+    <canvas id="canvas" width="300" height="300" style="display: none"></canvas>
+  </div>
+</body>
+</html>

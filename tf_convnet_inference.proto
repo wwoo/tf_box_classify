@@ -1,0 +1,18 @@
+// The server classifies 150x150 greyscale image into class labels
+
+syntax = "proto3";
+
+package tensorflow.serving;
+
+message BoxImageRequest {
+  repeated float image_data = 1 [packed = true];
+};
+
+message BoxImageResponse {
+  repeated float value = 1 [packed = true];
+};
+
+service BoxImageService {
+  // Classifies image into digits.
+  rpc Classify(BoxImageRequest) returns (BoxImageResponse);
+}
