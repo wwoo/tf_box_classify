@@ -156,7 +156,7 @@ def main(argv=None):
             'wc4': tf.Variable(tf.random_normal([5, 5, 128, 256])),
             # fully connected, 19*19*256 inputs, 1024 outputs
             'wd1': tf.Variable(tf.random_normal([10*10*256, 1024])),
-            # 1024 inputs, 2 class labels (prediction)
+            # 1024 inputs, 4 class labels (prediction)
             'out': tf.Variable(tf.random_normal([1024, NUM_CLASSES]))
         }
 
