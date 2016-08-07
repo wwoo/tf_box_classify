@@ -2,12 +2,16 @@
 
 This is a simple example of how to build a convolutional neural network (CNN) with TensorFlow.  It extends existing MNIST convnet examples with TensorFlow input queues for reading training and validation data in common image formats like JPEG.  You should be able to easily change the sample code and text files to use your own training data.
 
+[Link to YouTube Video](https://www.youtube.com/watch?v=40iJ0yS572E)
+
 The sample training data and code classifies images of a toy box into four states:
 
 1. Upright (box is upright)
 2. Tilted (box is tilted on its side)
 3. Open (box is upright and open)
 4. Spilled (box is tilted on it's side, open with contents spilled)
+
+115 images for each class is used to train the model.
 
 The main code samples are:
 
