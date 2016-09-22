@@ -13,6 +13,8 @@ The sample training data and code classifies images of a toy box into four state
 
 115 images for each class is used to train the model.
 
+`tf_convnet_test.ipynb` is a Jupyter notebook which runs through the training example.
+
 The main code samples are:
 
 `tf_convnet_test.py` reads the training and validation data from train.txt and valid.txt, then builds and executes the TensorFlow graph. Run it with no arguments:
