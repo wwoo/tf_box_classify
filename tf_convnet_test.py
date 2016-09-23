@@ -117,10 +117,7 @@ def conv_net(x, weights, biases, image_size, keep_prob=KEEP_PROB):
     return out
 
 def preprocess_images(image_batch, resize_factor=IMAGE_RESIZE_FACTOR):
-    gs_image_batch = tf.image.rgb_to_grayscale(image_batch,
-        name="rgb_to_grayscale")
     new_image_size = int(round(IMAGE_SIZE / resize_factor))
-
     return tf.image.resize_images(image_batch, new_image_size, new_image_size)
 
 def main(argv=None):
