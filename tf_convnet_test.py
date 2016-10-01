@@ -173,18 +173,15 @@ def main(argv=None):
         weights = {
             # 5x5 conv, 1 * IMAGE_CHANNELS input, 32 * IMAGE_CHANNELS outputs
             'wc1': tf.Variable(tf.truncated_normal([5, 5, 1 * IMAGE_CHANNELS,
-                32 * IMAGE_CHANNELS])),
+                32])),
             # 5x5 conv, 32 * IMAGE_CHANNELS inputs, 64 * IMAGE_CHANNELS outputs
-            'wc2': tf.Variable(tf.truncated_normal([5, 5, 32 * IMAGE_CHANNELS,
-                64 * IMAGE_CHANNELS])),
+            'wc2': tf.Variable(tf.truncated_normal([5, 5, 32, 64])),
             # 5x5 conv, 64 * IMAGE_CHANNELS inputs, 128 * IMAGE_CHANNELS outputs
-            'wc3': tf.Variable(tf.truncated_normal([5, 5, 64 * IMAGE_CHANNELS,
-                128 * IMAGE_CHANNELS])),
+            'wc3': tf.Variable(tf.truncated_normal([5, 5, 64, 128])),
             # 5x5 conv, 128 * IMAGE_CHANNELS inputs, 256 * IMAGE_CHANNELS outputs
-            'wc4': tf.Variable(tf.truncated_normal([5, 5, 128 * IMAGE_CHANNELS,
-                256 * IMAGE_CHANNELS])),
+            'wc4': tf.Variable(tf.truncated_normal([5, 5, 128, 256])),
             # fully connected, 19 * 19 * 256 * IMAGE_CHANNELS inputs, 1024 outputs
-            'wd1': tf.Variable(tf.truncated_normal([10 * 10 * 256 * IMAGE_CHANNELS, 1024])),
+            'wd1': tf.Variable(tf.truncated_normal([10 * 10 * 256, 1024])),
             # 1024 inputs, 2 class labels (prediction)
             'out': tf.Variable(tf.truncated_normal([1024, NUM_CLASSES]))
         }
@@ -192,10 +189,10 @@ def main(argv=None):
     # Store biases for our convolution and fully-connected layers
     with tf.name_scope('biases'):
         biases = {
-            'bc1': tf.Variable(tf.random_normal([IMAGE_CHANNELS * 32])),
-            'bc2': tf.Variable(tf.random_normal([IMAGE_CHANNELS * 64])),
-            'bc3': tf.Variable(tf.random_normal([IMAGE_CHANNELS * 128])),
-            'bc4': tf.Variable(tf.random_normal([IMAGE_CHANNELS * 256])),
+            'bc1': tf.Variable(tf.random_normal([32])),
+            'bc2': tf.Variable(tf.random_normal([64])),
+            'bc3': tf.Variable(tf.random_normal([128])),
+            'bc4': tf.Variable(tf.random_normal([256])),
             'bd1': tf.Variable(tf.random_normal([1024])),
             'out': tf.Variable(tf.random_normal([NUM_CLASSES]))
         }
