@@ -13,6 +13,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import time
+import math
 
 # hyper parameters to use for training
 TRAIN_BATCH_SIZE = 10
@@ -23,10 +24,10 @@ SHUFFLE_BATCHES = True
 LEARNING_RATE = 0.01
 NUM_CLASSES = 4
 KEEP_PROB = 0.75
+VALID_STEPS = 10
 
 # image parameters
-IMAGE_SIZE = 150
-IMAGE_RESIZE_FACTOR = 1
+IMAGE_SIZE = 64
 IMAGE_CHANNELS = 3
 
 def get_image_label_list(image_label_file):
@@ -49,6 +50,7 @@ def read_image_from_disk(input_queue):
     file_contents = tf.read_file(input_queue[0])
     rgb_image = tf.image.decode_jpeg(file_contents, channels=IMAGE_CHANNELS,
         name="decode_jpeg")
+    rgb_image = tf.image.resize_images(rgb_image, IMAGE_SIZE, IMAGE_SIZE)
 
     return rgb_image, label
 
@@ -61,7 +63,7 @@ def inputs(train_file, batch_size=TRAIN_BATCH_SIZE, num_epochs=TRAIN_EPOCHS):
     image_batch, label_batch = tf.train.batch([image, label],
         batch_size=batch_size)
 
-    return preprocess_images(image_batch), tf.one_hot(tf.to_int64(label_batch),
+    return image_batch, tf.one_hot(tf.to_int64(label_batch),
         NUM_CLASSES, on_value=1.0, off_value=0.0)
 
 def conv2d(x, W, b, strides=1):
@@ -77,9 +79,6 @@ def maxpool2d(x, k=2, layer=""):
         strides=[1, k, k, 1], padding='SAME')
 
 def conv_net(x, weights, biases, image_size, keep_prob=KEEP_PROB):
-    # Reshape the images to image_size x image_size
-    x = tf.reshape(x, shape=[-1, image_size, image_size, IMAGE_CHANNELS])
-
     # Convolution and max pooling layers
     # Each max pooling layer reduces dimensionality by 2
 
@@ -116,37 +115,31 @@ def conv_net(x, weights, biases, image_size, keep_prob=KEEP_PROB):
         # Output, class prediction
         out = tf.add(tf.matmul(fc1, weights['out']), biases['out'])
 
-    # maxpool_slice = tf.slice(conv1, [0, 0, 0, 0], [TRAIN_BATCH_SIZE, 75, 75, 1])
-    # maxpool_sample = tf.image_summary("maxpool_sample", maxpool_slice, max_images=10)
-
     return out
 
 def generate_image_summary(x, weights, biases, step, image_size=IMAGE_SIZE):
-    # Reshape the images to image_size x image_size
-    x = tf.reshape(x, shape=[-1, image_size, image_size, IMAGE_CHANNELS])
-
     with tf.name_scope('generate_image_summary'):
+        x =  tf.slice(x, [0, 0, 0, 0],
+            [VALID_BATCH_SIZE, image_size, image_size, 3])
         x = tf.nn.conv2d(x, weights['wc1'], strides=[1, 1, 1, 1],
             padding='SAME')
-        x = tf.nn.bias_add(x, biases['bc1'])
-        x_slice = tf.slice(x, [0, 0, 0, 0],
-            [TRAIN_BATCH_SIZE, image_size, image_size, 1])
-        conv_summary = tf.image_summary("img_conv_{:05d}".format(step),
-            x_slice, max_images=1)
-        relu_summary = tf.image_summary("img_relu_{:05d}".format(step),
-            tf.nn.relu(x_slice), max_images=1)
 
-        #conv = conv2d(x, weights['wc1'], biases['bc1'])
-        #conv_slice = tf.slice(conv, [0, 0, 0, 0],
-        #    [TRAIN_BATCH_SIZE, image_size, image_size, 1])
-        #image_summary = tf.image_summary("conv_{:05d}".format(step),
-        #    conv_slice, max_images=1)
+        # Nifty grid image summary via:
+        # http://stackoverflow.com/questions/33802336/visualizing-output-of-convolutional-layer-in-tensorflow
+
+        x = tf.slice(x, [0, 0, 0, 0], [1, -1, -1, -1])
+        x = tf.reshape(x, [IMAGE_SIZE, IMAGE_SIZE, 32])
+
+        pad_xy = image_size + 4
+        x = tf.image.resize_image_with_crop_or_pad(x, pad_xy, pad_xy)
+        x = tf.reshape(x, [pad_xy, pad_xy, 4, 8])
+        x = tf.transpose(x, [2, 0, 3, 1])
+        x = tf.reshape(x, [1, pad_xy * 4, pad_xy * 8, 1])
+
+        conv_summary = tf.image_summary("img_conv_{:05d}".format(step), x)
+        relu_summary = tf.image_summary("img_relu_{:05d}".format(step), tf.nn.relu(x))
 
     return conv_summary, relu_summary
-
-def preprocess_images(image_batch, resize_factor=IMAGE_RESIZE_FACTOR):
-    new_image_size = int(round(IMAGE_SIZE / resize_factor))
-    return tf.image.resize_images(image_batch, new_image_size, new_image_size)
 
 def main(argv=None):
 
@@ -155,7 +148,7 @@ def main(argv=None):
         train_file = "./train.txt"
         valid_file = "./valid.txt"
 
-        image_size = IMAGE_SIZE / IMAGE_RESIZE_FACTOR
+        image_size = IMAGE_SIZE
 
         train_image_batch, train_label_batch = inputs(train_file,
             batch_size=TRAIN_BATCH_SIZE, num_epochs=TRAIN_EPOCHS)
@@ -168,22 +161,24 @@ def main(argv=None):
 
     y_ = tf.placeholder("float32", shape=[None, NUM_CLASSES])
 
+    # k is the image size after 4 convolution layers
+    k = int(math.ceil(IMAGE_SIZE / 2.0 / 2.0 / 2.0 / 2.0))
+
     # Store weights for our convolution & fully-connected layers
     with tf.name_scope('weights'):
         weights = {
-            # 5x5 conv, 1 * IMAGE_CHANNELS input, 32 * IMAGE_CHANNELS outputs
-            'wc1': tf.Variable(tf.truncated_normal([5, 5, 1 * IMAGE_CHANNELS,
-                32])),
-            # 5x5 conv, 32 * IMAGE_CHANNELS inputs, 64 * IMAGE_CHANNELS outputs
-            'wc2': tf.Variable(tf.truncated_normal([5, 5, 32, 64])),
-            # 5x5 conv, 64 * IMAGE_CHANNELS inputs, 128 * IMAGE_CHANNELS outputs
-            'wc3': tf.Variable(tf.truncated_normal([5, 5, 64, 128])),
-            # 5x5 conv, 128 * IMAGE_CHANNELS inputs, 256 * IMAGE_CHANNELS outputs
-            'wc4': tf.Variable(tf.truncated_normal([5, 5, 128, 256])),
-            # fully connected, 19 * 19 * 256 * IMAGE_CHANNELS inputs, 1024 outputs
-            'wd1': tf.Variable(tf.truncated_normal([10 * 10 * 256, 1024])),
+            # 5x5 conv, 3 input channel, 32 outputs each
+            'wc1': tf.Variable(tf.random_normal([5, 5, 1 * IMAGE_CHANNELS, 32])),
+            # 5x5 conv, 32 inputs, 64 outputs
+            'wc2': tf.Variable(tf.random_normal([5, 5, 32, 64])),
+            # 5x5 conv, 64 inputs, 128 outputs
+            'wc3': tf.Variable(tf.random_normal([5, 5, 64, 128])),
+            # 5x5 conv, 128 inputs, 256 outputs
+            'wc4': tf.Variable(tf.random_normal([5, 5, 128, 256])),
+            # fully connected, k * k * 256 inputs, 1024 outputs
+            'wd1': tf.Variable(tf.random_normal([k * k * 256, 1024])),
             # 1024 inputs, 2 class labels (prediction)
-            'out': tf.Variable(tf.truncated_normal([1024, NUM_CLASSES]))
+            'out': tf.Variable(tf.random_normal([1024, NUM_CLASSES]))
         }
 
     # Store biases for our convolution and fully-connected layers
@@ -223,15 +218,14 @@ def main(argv=None):
 
     sess = tf.Session()
 
-    # conv_filter_sample = tf.image_summary("conv_filter_sample",
-    #    tf.reshape(weights['wc1'], [32, 5, 5, 1]), max_images=3)
-
     writer = tf.train.SummaryWriter("./logs", sess.graph)
     init_op = tf.initialize_all_variables()
 
     # we need init_local_op step only on tensorflow 0.10rc due to a regression from 0.9
     # https://github.com/tensorflow/models/pull/297
     init_local_op = tf.initialize_local_variables()
+
+    saver = tf.train.Saver()
 
     step = 0
 
@@ -248,7 +242,7 @@ def main(argv=None):
                 train_step.run(feed_dict={keep_prob: 0.75,
                     x_: x, y_: y})
 
-                if step % TRAIN_BATCH_SIZE == 0:
+                if step % VALID_STEPS == 0:
                     x, y = sess.run([valid_image_batch, valid_label_batch])
                     conv_summary, relu_summary = generate_image_summary(x_, weights, biases, step, image_size)
                     result = sess.run([cost_summary, accuracy_summary, accuracy, conv_summary, relu_summary, w_summary, b_summary],
@@ -271,6 +265,8 @@ def main(argv=None):
                     writer.add_summary(b_summary_str, step)
 
                     print("Accuracy at step %s: %s" % (step, acc))
+
+                    save_path = saver.save(sess, "./model.ckpt")
 
 
         except tf.errors.OutOfRangeError:
