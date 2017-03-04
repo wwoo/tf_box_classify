@@ -50,7 +50,7 @@ def read_image_from_disk(input_queue):
     file_contents = tf.read_file(input_queue[0])
     rgb_image = tf.image.decode_jpeg(file_contents, channels=IMAGE_CHANNELS,
         name="decode_jpeg")
-    rgb_image = tf.image.resize_images(rgb_image, IMAGE_SIZE, IMAGE_SIZE)
+    rgb_image = tf.image.resize_images(rgb_image, [IMAGE_SIZE, IMAGE_SIZE])
 
     return rgb_image, label
 
@@ -136,8 +136,8 @@ def generate_image_summary(x, weights, biases, step, image_size=IMAGE_SIZE):
         x = tf.transpose(x, [2, 0, 3, 1])
         x = tf.reshape(x, [1, pad_xy * 4, pad_xy * 8, 1])
 
-        conv_summary = tf.image_summary("img_conv_{:05d}".format(step), x)
-        relu_summary = tf.image_summary("img_relu_{:05d}".format(step), tf.nn.relu(x))
+        conv_summary = tf.summary.image("img_conv_{:05d}".format(step), x)
+        relu_summary = tf.summary.image("img_relu_{:05d}".format(step), tf.nn.relu(x))
 
     return conv_summary, relu_summary
 
@@ -201,8 +201,8 @@ def main(argv=None):
     # Calculate loss
     with tf.name_scope('cross_entropy'):
         # Define loss and optimizer
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y_))
-        cost_summary = tf.scalar_summary("cost_summary", cost)
+        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y_))
+        cost_summary = tf.summary.scalar("cost_summary", cost)
 
     # Run optimizer step
     with tf.name_scope('train'):
@@ -212,18 +212,16 @@ def main(argv=None):
     with tf.name_scope('predict'):
         correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y_, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-        accuracy_summary = tf.scalar_summary("accuracy_summary", accuracy)
-        w_summary = tf.histogram_summary("weights", weights['wc1'])
-        b_summary = tf.histogram_summary("biases", biases['bc1'])
+        accuracy_summary = tf.summary.scalar("accuracy_summary", accuracy)
+        w_summary = tf.summary.histogram("weights", weights['wc1'])
+        b_summary = tf.summary.histogram("biases", biases['bc1'])
 
     sess = tf.Session()
 
-    writer = tf.train.SummaryWriter("./logs", sess.graph)
-    init_op = tf.initialize_all_variables()
+    writer = tf.summary.FileWriter("./logs", sess.graph)
 
-    # we need init_local_op step only on tensorflow 0.10rc due to a regression from 0.9
-    # https://github.com/tensorflow/models/pull/297
-    init_local_op = tf.initialize_local_variables()
+    init_op = tf.global_variables_initializer()
+    init_local_op = tf.local_variables_initializer()
 
     saver = tf.train.Saver()
 
@@ -231,7 +229,7 @@ def main(argv=None):
 
     with sess.as_default():
         sess.run(init_op)
-        sess.run(init_local_op) # we need this only with tensorflow 0.10rc
+        sess.run(init_local_op)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
